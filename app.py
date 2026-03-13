@@ -202,8 +202,9 @@ div[data-testid="stMetric"] [data-testid="stMetricValue"] {
 #  DATA LOADING & PREPROCESSING
 # ═══════════════════════════════════════════════════════════════════════════════
 @st.cache_data
-def load_data():
-    df = pd.read_csv("Amazon_Returns.csv")
+def process_data(raw_bytes: bytes):
+    import io
+    df = pd.read_csv(io.BytesIO(raw_bytes))
     df["OrderDate"] = pd.to_datetime(df["OrderDate"], dayfirst=True)
     df["Year"]      = df["OrderDate"].dt.year
     df["Month"]     = df["OrderDate"].dt.month
@@ -214,7 +215,43 @@ def load_data():
     df["NetRevenue"] = df["TotalAmount"] - df["ShippingCost"] - df["Tax"]
     return df
 
-df_full = load_data()
+# ── Resolve data source: local file → sidebar uploader ────────────────────────
+import os, pathlib
+
+_LOCAL_PATHS = ["Amazon_Returns.csv", "data/Amazon_Returns.csv"]
+_raw_bytes = None
+
+for _p in _LOCAL_PATHS:
+    if pathlib.Path(_p).exists():
+        _raw_bytes = pathlib.Path(_p).read_bytes()
+        break
+
+if _raw_bytes is None:
+    # Show a clean upload prompt and stop execution until the file is provided
+    st.markdown("""
+    <div style='text-align:center;padding:60px 20px'>
+        <div style='font-family:Syne,sans-serif;font-size:2rem;font-weight:800;color:#f97316'>
+            📦 Amazon Returns Dashboard
+        </div>
+        <div style='font-family:DM Sans,sans-serif;color:#8b92a5;margin-top:8px;font-size:1rem'>
+            Upload your <code>Amazon_Returns.csv</code> to launch the dashboard
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    uploaded = st.file_uploader(
+        "Upload Amazon_Returns.csv",
+        type=["csv"],
+        label_visibility="collapsed",
+    )
+
+    if uploaded is None:
+        st.info("👆 Please upload **Amazon_Returns.csv** to continue.")
+        st.stop()
+
+    _raw_bytes = uploaded.read()
+
+df_full = process_data(_raw_bytes)
 
 # ── Plotly theme helper ────────────────────────────────────────────────────────
 PLOTLY_LAYOUT = dict(
